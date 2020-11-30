@@ -1,5 +1,6 @@
-# APA_multitask_causal_hurdle_NN
-Submission of the seminar paper (jupyter notebook) for the Applied Predictive Analytics
+# Multitask Hurdle Causal Neural Networks
+Submission of the seminar paper (jupyter notebook) for the Applied Predictive Analytics seminar
+
 Authored by Ansar Aynetdinov and Duygu Ider
 
 Since we were working on this project in Google Colab, the `dir_path` specified in the third code cell of the notebook and leading to the `apa` folder needs to be changed accordingly, depeding on where this repo is accessed from.
