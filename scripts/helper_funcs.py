@@ -1,62 +1,27 @@
+import os
+import random
+import torch
 import numpy as np
 import pandas as pd
-from sklearn.metrics import roc_auc_score, mean_squared_error, mean_absolute_error
-from torch.utils.data import Dataset, DataLoader
-
-class ExperimentData(Dataset):
-  def __init__(self, X, y, c):
-      """
-      Torch data Loader for experimental data
-      X : array-like, shape (n_samples, n_features)
-        Input data.
-      y : array-like, shape (n_samples,)
-        Target values (checkout amount) for regression.
-      c : array-like, shape (n_samples,)
-        Target values (class labels) for classification.
-      """
-      self.X = X
-      self.y = y
-      self.c = c
-
-  def __len__(self):
-      return self.X.shape[0]
-
-  def __getitem__(self, idx):
-      return self.X[idx, :], self.y[idx], self.c[idx]
-
-class WeightedExperimentData(Dataset):
-  def __init__(self, X, y, c, w):
-      self.X = X
-      self.c = c
-      self.y = y
-      self.w = w
-      
-  def __len__(self):
-      return self.X.shape[0]
-
-  def __getitem__(self, idx):
-      return self.X[idx,:], self.y[idx], self.c[idx], self.w[idx]
-
-class TreatedWeightedExperimentData(Dataset):
-  def __init__(self, X, y, c, w, g):
-      self.X = X
-      self.c = c
-      self.y = y
-      self.w = w
-      self.g = g
-      
-  def __len__(self):
-      return self.X.shape[0]
-
-  def __getitem__(self, idx):
-      return self.X[idx,:], self.y[idx], self.c[idx], self.w[idx], self.g[idx]
+from sklearn.metrics import mean_squared_error, mean_absolute_error
 
 
-###### Comparison on transformed outcome loss
+def set_seed():
+    """
+    Set all the necessary seeds to ensure replicability
+    """
+    os.environ['PYTHONHASHSEED'] = str(1)
+    random.seed(2)
+    np.random.seed(3)
+    torch.manual_seed(4)
+    torch.cuda.manual_seed_all(5)
+    torch.backends.cudnn.deterministic = True
+    torch.backends.cudnn.benchmark = False
+
 
 def calc_prediction_error(prediction_dict, y_true, g, prob_treatment=None, tau_true=None):
     """
-    Calculate the prediction error of the model predictions
+    Calculate the prediction error (TOL) of the model predictions
     prediction_dict : dict
         Dictionary with the model predictions in the form model_name: array of predictions
     y_true : 1D array-like
@@ -87,21 +52,17 @@ def calc_prediction_error(prediction_dict, y_true, g, prob_treatment=None, tau_t
     return output
 
 
-"""
-Evaluation of treatment effect estimation
-"""
-
 def transformed_outcome_loss(tau_pred, y_true, g, prob_treatment):
     """
     Calculate a biased estimate of the mean squared error of individualized treatment effects
 
     tau_pred : array
-      The predicted individualized treatment effects.
+        The predicted individualized treatment effects.
     y_true : array
-      The observed individual outcome.
+        The observed individual outcome.
     g : array, {0,1}
-      An indicator of the treatment group. Currently supports only two treatment groups, typically
-      control (g=0) and treatment group (g=1).
+        An indicator of the treatment group. Currently supports only two treatment groups, typically
+        control (g=0) and treatment group (g=1).
     """
     # Transformed outcome
     y_trans = (g - prob_treatment)  * y_true / (prob_treatment * (1-prob_treatment))
@@ -113,13 +74,9 @@ def expected_policy_profit(targeting_decision, g, observed_profit, prob_treatmen
     """
     Calculate the profit of a coupon targeting campaign
     """
-    return np.sum(((1-targeting_decision) * (1-g) * observed_profit)/(1-prob_treatment) +\
-                   (targeting_decision  *    g  * observed_profit)/(prob_treatment))
+    return np.sum(((1-targeting_decision) * (1-g) * observed_profit)/(1-prob_treatment) +
+                    (targeting_decision  *    g  * observed_profit)/(prob_treatment))
 
-
-"""
-Decision-making based on profit/cost setting
-"""
 
 def bayesian_targeting_policy(tau_pred, contact_cost, offer_accept_prob, offer_cost, value=None):
     """
@@ -128,18 +85,18 @@ def bayesian_targeting_policy(tau_pred, contact_cost, offer_accept_prob, offer_c
     larger than the expected cost of targeting.
 
     tau_pred : array-like
-      Estimated treatment effect for each observations. Typically the effect on the expected profit.
-      If tau_pred is the treatment effect on conversion, 'value' needs to be specified.
+        Estimated treatment effect for each observations. Typically the effect on the expected profit.
+        If tau_pred is the treatment effect on conversion, 'value' needs to be specified.
 
     contact_cost : float or array-like
-      Static cost that realizes independent of outcome
+        Static cost that realizes independent of outcome
 
     offer_cost : float or array-like
-      Cost that realizes when the offer is accepted
+        Cost that realizes when the offer is accepted
 
     value : float or array-like, default: None
-      Value of the observations in cases where tau_pred is the
-      change in acceptance probability (binary outcome ITE)
+        Value of the observations in cases where tau_pred is the
+        change in acceptance probability (binary outcome ITE)
     """
     if value:
         tau_pred = tau_pred * value
